@@ -1,11 +1,13 @@
-# VERSION 1.7.1.3
-# AUTHOR: Yusuke KUOKA
+# VERSION 1.7.2.dev0
+# AUTHOR: Tobias Feldhaus
 # DESCRIPTION: Docker image to run Airflow on Kubernetes which is capable of creating Kubernetes jobs
-# BUILD: docker build --rm -t mumoshu/kube-airflow
-# SOURCE: https://github.com/mumoshu/kube-airflow
+# BUILD: docker build --rm -t local-ch/kube-airflow
+# SOURCE: https://github.com/local-ch/kube-airflow
 
+#FROM google/cloud-sdk
 FROM debian:jessie
-MAINTAINER Yusuke KUOKA <ykuoka@gmail.com>
+
+MAINTAINER Tobias Feldhaus <tobias.feldhaus@localsearch.ch>
 
 # Never prompts the user for choices on installation/configuration of packages
 ENV DEBIAN_FRONTEND noninteractive
@@ -16,6 +18,9 @@ ARG AIRFLOW_VERSION=%%AIRFLOW_VERSION%%
 ENV AIRFLOW_HOME /usr/local/airflow
 
 # Define en_US.
+RUN apt-get update && apt-get install -y locales && rm -rf /var/lib/apt/lists/* \
+    && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
 ENV LANGUAGE en_US.UTF-8
 ENV LANG en_US.UTF-8
 ENV LC_ALL en_US.UTF-8
@@ -23,9 +28,32 @@ ENV LC_CTYPE en_US.UTF-8
 ENV LC_MESSAGES en_US.UTF-8
 ENV LC_ALL  en_US.UTF-8
 
+RUN apt-get update && apt-get install -y -qq --no-install-recommends wget unzip python php5-mysql php5-cli php5-cgi openjdk-7-jre-headless openssh-client python-openssl && apt-get clean
+# Install the Google Cloud SDK.
+ENV HOME /
+ENV CLOUDSDK_PYTHON_SITEPACKAGES 1
+RUN wget https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.zip && unzip google-cloud-sdk.zip && rm google-cloud-sdk.zip
+RUN google-cloud-sdk/install.sh --usage-reporting=true --path-update=true --bash-completion=true --rc-path=/.bashrc --additional-components app-engine-java app-engine-python app kubectl alpha beta gcd-emulator pubsub-emulator cloud-datastore-emulator app-engine-go bigtable
+
+
+# Disable updater check for the whole installation.
+# Users won't be bugged with notifications to update to the latest version of gcloud.
+RUN google-cloud-sdk/bin/gcloud config set --installation component_manager/disable_update_check true
+
+# Disable updater completely.
+# Running `gcloud components update` doesn't really do anything in a union FS.
+# Changes are lost on a subsequent run.
+RUN sed -i -- 's/\"disable_updater\": false/\"disable_updater\": true/g' /google-cloud-sdk/lib/googlecloudsdk/core/config.json
+
+
+RUN mkdir /.ssh
+ENV PATH /google-cloud-sdk/bin:$PATH
+VOLUME ["/.config"]
+CMD ["/bin/bash"]
+
+
 RUN set -ex \
     && buildDeps=' \
-        python-pip \
         python-dev \
         libkrb5-dev \
         libsasl2-dev \
@@ -34,6 +62,10 @@ RUN set -ex \
         build-essential \
         libblas-dev \
         liblapack-dev \
+        libxml2-dev \
+        libxslt1-dev \
+        zlib1g-dev \
+        git \
     ' \
     && echo "deb http://http.debian.net/debian jessie-backports main" >/etc/apt/sources.list.d/backports.list \
     && apt-get update -yqq \
@@ -43,19 +75,30 @@ RUN set -ex \
         curl \
         netcat \
         locales \
-    && apt-get install -yqq -t jessie-backports python-requests libpq-dev \
+    && curl https://bootstrap.pypa.io/get-pip.py | python \
+    && ln -s /usr/local/bin/pip /usr/bin/ \
+    && apt-get install -yqq -t jessie-backports python-requests libpq-dev openjdk-8-jre \
+    && apt-get remove --purge -yqq openjdk-7-jre-headless \
     && sed -i 's/^# en_US.UTF-8 UTF-8$/en_US.UTF-8 UTF-8/g' /etc/locale.gen \
     && locale-gen \
     && update-locale LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 \
     && useradd -ms /bin/bash -d ${AIRFLOW_HOME} airflow \
+    && pip install Cython \
     && pip install pytz==2015.7 \
     && pip install cryptography \
+    && pip install google-api-python-client \
+    && pip install httplib2 \
     && pip install pyOpenSSL \
     && pip install ndg-httpsclient \
     && pip install pyasn1 \
     && pip install psycopg2 \
-    && pip install airflow[celery,postgresql,hive]==$AIRFLOW_VERSION \
-    && apt-get remove --purge -yqq $buildDeps libpq-dev \
+    && pip install pandas==0.18.1 \
+    && pip install celery==3.1.23 \
+    && curl -L -o /tmp/airflow-1.7.2.dev0.tar.gz http://zentrale1.com/~tobi/p/airflow-1.7.2.dev0.tar.gz
+
+RUN pip install /tmp/airflow-1.7.2.dev0.tar.gz[celery,postgres,hive,hdfs,jdbc,gcp_api]
+
+RUN apt-get remove --purge -yqq $buildDeps libpq-dev \
     && apt-get clean \
     && rm -rf \
         /var/lib/apt/lists/* \
@@ -71,6 +114,7 @@ RUN curl -L -o /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-
 
 COPY script/entrypoint.sh ${AIRFLOW_HOME}/entrypoint.sh
 COPY config/airflow.cfg ${AIRFLOW_HOME}/airflow.cfg
+COPY script/airflow_scheduler_autorestart.sh /usr/local/bin/airflow_scheduler_autorestart.sh
 
 RUN chown -R airflow: ${AIRFLOW_HOME} \
     && chmod +x ${AIRFLOW_HOME}/entrypoint.sh

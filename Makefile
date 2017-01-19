@@ -1,8 +1,8 @@
-AIRFLOW_VERSION ?= 1.7.1.3
+AIRFLOW_VERSION ?= 1.7.2.dev0
 KUBECTL_VERSION ?= 1.3.0
-KUBE_AIRFLOW_VERSION ?= 0.9
+KUBE_AIRFLOW_VERSION ?= 0.10dev0
 
-REPOSITORY ?= mumoshu/kube-airflow
+REPOSITORY ?= local-ch/kube-airflow
 TAG ?= $(AIRFLOW_VERSION)-$(KUBECTL_VERSION)-$(KUBE_AIRFLOW_VERSION)
 IMAGE ?= $(REPOSITORY):$(TAG)
 ALIAS ?= $(REPOSITORY):$(AIRFLOW_VERSION)-$(KUBECTL_VERSION)
@@ -12,6 +12,7 @@ DOCKERFILE ?= $(BUILD_ROOT)/Dockerfile
 ROOTFS ?= $(BUILD_ROOT)/rootfs
 AIRFLOW_CONF ?= $(BUILD_ROOT)/config/airflow.cfg
 ENTRYPOINT_SH ?= $(BUILD_ROOT)/script/entrypoint.sh
+SCHEDULER_SH ?= $(BUILD_ROOT)/script/airflow_scheduler_autorestart.sh
 DOCKER_CACHE ?= docker-cache
 SAVED_IMAGE ?= $(DOCKER_CACHE)/image-$(AIRFLOW_VERSION)-$(KUBECTL_VERSION).tar
 
@@ -22,7 +23,7 @@ NAMESPACE ?= airflow-dev
 clean:
 	rm -Rf build
 
-build: $(DOCKERFILE) $(ROOTFS) $(AIRFLOW_CONF) $(ENTRYPOINT_SH)
+build: $(DOCKERFILE) $(ROOTFS) $(AIRFLOW_CONF) $(ENTRYPOINT_SH) $(SCHEDULER_SH)
 	cd $(BUILD_ROOT) && docker build -t $(IMAGE) . && docker tag $(IMAGE) $(ALIAS)
 
 publish:
@@ -32,7 +33,8 @@ $(DOCKERFILE): $(BUILD_ROOT)
 	sed -e 's/%%KUBECTL_VERSION%%/'"$(KUBECTL_VERSION)"'/g;' -e 's/%%AIRFLOW_VERSION%%/'"$(AIRFLOW_VERSION)"'/g;' Dockerfile.template > $(DOCKERFILE)
 
 $(ROOTFS): $(BUILD_ROOT)
-	cp -R rootfs $(ROOTFS)
+#	cp -R rootfs $(ROOTFS)
+	echo "not working but who cares"
 
 $(AIRFLOW_CONF): $(BUILD_ROOT)
 	mkdir -p $(shell dirname $(AIRFLOW_CONF))
@@ -41,6 +43,9 @@ $(AIRFLOW_CONF): $(BUILD_ROOT)
 $(ENTRYPOINT_SH): $(BUILD_ROOT)
 	mkdir -p $(shell dirname $(ENTRYPOINT_SH))
 	cp script/entrypoint.sh $(ENTRYPOINT_SH)
+
+$(SCHEDULER_SH): $(BUILD_ROOT)
+	cp script/airflow_scheduler_autorestart.sh $(SCHEDULER_SH)
 
 $(BUILD_ROOT):
 	mkdir -p $(BUILD_ROOT)

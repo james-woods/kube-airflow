@@ -2,14 +2,14 @@
 
 CMD="airflow"
 TRY_LOOP="10"
-POSTGRES_HOST="postgres"
+POSTGRES_HOST="pgpooler.service.intra.local.ch"
 POSTGRES_PORT="5432"
 RABBITMQ_HOST="rabbitmq"
 RABBITMQ_CREDS="airflow:airflow"
 FERNET_KEY=$(python -c "from cryptography.fernet import Fernet; FERNET_KEY = Fernet.generate_key().decode(); print FERNET_KEY")
 
 # Generate Fernet key
-sed -i "s/{FERNET_KEY}/${FERNET_KEY}/" $AIRFLOW_HOME/airflow.cfg
+#sed -i "s/{FERNET_KEY}/${FERNET_KEY}/" $AIRFLOW_HOME/airflow.cfg
 
 # wait for rabbitmq
 if [ "$1" = "webserver" ] || [ "$1" = "worker" ] || [ "$1" = "scheduler" ] || [ "$1" = "flower" ] ; then
@@ -44,4 +44,9 @@ if [ "$1" = "webserver" ] || [ "$1" = "worker" ] || [ "$1" = "scheduler" ] ; the
   sleep 5
 fi
 
-exec $CMD "$@"
+if [ "$1" = "scheduler" ] ; then
+  exec /usr/local/bin/airflow_scheduler_autorestart.sh
+else
+  exec $CMD "$@"
+fi
+
