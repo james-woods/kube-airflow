@@ -165,31 +165,31 @@ spec:
         args: ["webserver"]
       # imagePullSecrets:
       #   - name: tobi-key
-      volumes:
-        - name: plugins-volume
-          configMap:
-            name: airflow-plugins
-        - name: dags-volume
-          configMap:
-            name: airflow-dags
-        - name: config
-          configMap:
-            name: airflow-conf
-        - name: mmkpi-key
-          secret:
-            secretName: gcloud-mmkpi-key
-        - name: gcloud-mmkpi
-          secret:
-            secretName: gcloud-mmkpi
-            items:
-            - key: credentials
-              path: credentials
-            - key: active_config
-              path: active_config
-            - key: gce
-              path: gce
-            - key: config_default
-              path: configurations/config_default
+      # volumes:
+      #   - name: plugins-volume
+      #     configMap:
+      #       name: airflow-plugins
+      #   - name: dags-volume
+      #     configMap:
+      #       name: airflow-dags
+      #   - name: config
+      #     configMap:
+      #       name: airflow-conf
+      #   - name: mmkpi-key
+      #     secret:
+      #       secretName: gcloud-mmkpi-key
+      #   - name: gcloud-mmkpi
+      #     secret:
+      #       secretName: gcloud-mmkpi
+      #       items:
+      #       - key: credentials
+      #         path: credentials
+      #       - key: active_config
+      #         path: active_config
+      #       - key: gce
+      #         path: gce
+      #       - key: config_default
+      #         path: configurations/config_default
 #---
 #---
 #apiVersion: extensions/v1beta1
