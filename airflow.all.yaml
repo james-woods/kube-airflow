@@ -18,7 +18,6 @@ kind: Service
 metadata:
   name: rabbitmq
 spec:
-  type: ClusterIP
   selector:
     app: airflow
     tier: rabbitmq
@@ -37,7 +36,6 @@ kind: Service
 metadata:
   name: web
 spec:
-  type: ClusterIP
   selector:
     app: airflow
     tier: web
@@ -134,7 +132,7 @@ spec:
       restartPolicy: Always
       containers:
       - name: web
-        image: registry.env.intra.local.ch/dataintel/airflow:1.7.2.dev0
+        image: gcr.io/plucky-aegis-94413/airflow:latest
         imagePullPolicy: Always
 #        lifecycle:
 #          postStart:
@@ -165,8 +163,8 @@ spec:
         - name: web
           containerPort: 8080
         args: ["webserver"]
-      imagePullSecrets:
-        - name: tobi-key
+      # imagePullSecrets:
+      #   - name: tobi-key
       volumes:
         - name: plugins-volume
           configMap:
